@@ -1,4 +1,4 @@
-from math import sqrt, acos, radians, cos
+from math import sqrt, acos, radians, cos, atan, pi, degrees, sin
 
 
 class Ellipsoid:
@@ -9,7 +9,7 @@ class Ellipsoid:
    :param f: Factor de achatamiento de la relacion 1/f
    """
 
-    def __init__(self, a, f):
+    def __init__(self, a: float, f: float):
         self.a = a
         self.f = 1/f
         self.b = self.polar_semiaxis()
@@ -103,3 +103,44 @@ class Radius:
         :rtype: float
         """
         return self.curvature_normal_section() * cos(radians(self.latitude))
+
+class Converter:
+
+    def __init__(self, ellipsoid: Ellipsoid):
+
+        self.ellipsoid = ellipsoid
+
+        pass
+
+    def ecef2geo(self, x, y, z):
+        """
+
+        :return: {latitude, longitude, h}
+        :rtype: dict
+        """
+
+        longitude = atan(y/x)
+
+        e = self.ellipsoid.first_eccentricity()
+
+        phi0 = atan(z/sqrt(x**2 + y**2) * (1+e**2/(1-e**2))) # radians
+
+        while True:
+            radius = Radius(self.ellipsoid, degrees(phi0))
+            N = radius.curvature_normal_section()
+
+            latitude = atan( z/sqrt(x**2 + y**2) * (1+ e**2*N*sin(phi0)/z) );
+            if abs(degrees(latitude) - degrees(phi0)) < 0.0000000001:
+                break
+            
+            phi0 = latitude
+
+        
+        radius = Radius(self.ellipsoid, degrees(latitude))
+
+        if abs(degrees(latitude)) == 90:
+            h = z/sin(latitude) - radius.curvature_normal_section()*(1-e**2);
+        else:
+            h = sqrt(x**2 + y**2)/cos(latitude) - radius.curvature_normal_section();
+        
+        return {'latitude': degrees(latitude), 'longitude': degrees(longitude), 'h': h}
